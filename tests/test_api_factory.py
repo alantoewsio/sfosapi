@@ -1,9 +1,9 @@
 import pytest
 from defusedxml import ElementTree as ET
 
-from sophosapi.api_factory import _create_element
-from sophosapi.api_factory import json_to_xml
-from sophosapi.api_factory import xml_to_json
+from sfosapi.api_factory import _create_element
+from sfosapi.api_factory import json_to_xml
+from sfosapi.api_factory import xml_to_json
 
 
 def element_equality(e1, e2):

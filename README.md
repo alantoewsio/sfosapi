@@ -1,118 +1,129 @@
-# The unofficial Sophos SFOS Python SDK
-This package is a Python SDK used to interface with the Sophos SFOS API. Its
+# Python SDK for Sophos SFOS Firewalls
+
+Forked from Steven Sultana's good work here [`https://github.com/stevensultana/sophosapi`](https://github.com/stevensultana/sophosapi)
+
+Thank you Steven, this saveda lot of time!
+
+This fork currently makes the following changes:
+
+1.  Added insecure_certificate option to Client to support connecting to firewalls that use an untrusted certificate
+2.  Changed Request apiVersion= to  optional value, not included by default
+3.  Removed encrypted password option due to changes in later sfos version - will revisit this later
+4.  Naming changes:
+    - library name changed to sfosapi to be more precise
+    - changed client.server property to client.address (purely personal preference)
+
+---
+
+This package is a Python SDK used to interface with the Sophos SFOS API. Its  
 interface is JSON-based, as opposed to Sophos' XML. This means that sometimes, there are small deviations from Sophos' API, which are listed [here](./API%20Deviations.md).
 
 ## Quick start
-1. Set up a python virtual environment
-2. Install the package: `pip install git+https://github.com/stevensultana/sophosapi`
-3. Set up your Firewall for API, create an API user on your Firewall and get an encrypted form of the password:
-    - https://docs.sophos.com/nsg/sophos-firewall/18.5/Help/en-us/webhelp/onlinehelp/AdministratorHelp/BackupAndFirmware/API/APIUsingAPI/index.html
-   - https://docs.sophos.com/nsg/sophos-firewall/18.5/Help/en-us/webhelp/onlinehelp/AdministratorHelp/BackupAndFirmware/API/index.html#get-the-encrypted-password-for-api-requests
-4. Run an initial test script:
-``` python
-from sophosapi import Client
 
+1.  Set up a python virtual environment
+2.  Install the package: `pip install git+https://github.com/alantoewsio/sfosapi`
+3.  Set up your Firewall for API, create an API user on your Firewall and get an encrypted form of the password:
+    - [https://docs.sophos.com/nsg/sophos-firewall/latest/API/index.html](https://docs.sophos.com/nsg/sophos-firewall/latest/API/index.html)
+    - [https://docs.sophos.com/nsg/sophos-firewall/latest/Help/en-us/webhelp/onlinehelp/AdministratorHelp/BackupAndFirmware/API/index.html#get-the-encrypted-password-for-api-requests](https://docs.sophos.com/nsg/sophos-firewall/19.5/Help/en-us/webhelp/onlinehelp/AdministratorHelp/BackupAndFirmware/API/index.html#get-the-encrypted-password-for-api-requests)
+4.  Run an initial test script:
+
+```python
+from sfosapi import Client
 client = Client(
-    username="your_username",
-    password="your_encrypted_password",
-    server="host_name_or_ip_address",
-    port="4444",  # default is 4444 - so you can omit this
-)
+		username="your_username",
+		password="your_encrypted_password",
+		address="host_name_or_ip_address",
+		port="4444", # default is 4444 - so you can omit this
+	)
 
 login = client.test_login()
 if login["status_code"] != 200:
-    print(login["message"])
-    exit(login["status_code"])
+	print(login["message"])
+	exit(login["status_code"])
 else:
-    print(login["message"])
-    exit 0
+	print(login["message"])
+exit 0
 ```
 
 ## Usage
 
-- The available APIs are:
-  - `get(entity)` - get a list of all entities of this type.
+**The available APIs are**:
 
-    Eg. `responses = client.get("Zone")  # list of all Zones`
+- `get(entity)` - get a list of all entities of this type.   
+  Eg. `responses = client.get("Zone")  # list of all Zones`
+- `get_filter(entity_name, filter_type, name)` - get a list of entities which match the name, or except the given name. Note that the output is a list, even for 1 item.  
+      Eg. `responses = client.get_filter("Zone", Filter.EQUAL, "LAN")  # get LAN zone`
+  Eg. `responses = client.get_filter("Zone", Filter.LIKE, "AN")  # get zones with "AN" in the name`
+  Eg. `responses = client.get_filter("Zone", Filter.EXCEPT, "LAN")  # get all zones except LAN`
+  **Note** To use filters, you need to import the Filter enum: `from sophosapi import Filter`
+- `set(entity, data)` - create or update an entity, with the given data.  
+      The response is not a list, but the direct data.  
+      Eg.
 
-  - `get_filter(entity_name, filter_type, name)` - get a list of entities which
-    match the name, or except the given name. Note that the output is a list,
-    even for 1 item.
+```json
+data = {  
+  "Name": "new_zone",  
+  "Type": "LAN",  
+  "ApplianceAccess": {  
+    "AuthenticationServices": {  
+      "CaptivePortal": "Enable"  
+     },  
+     "NetworkServices": {  
+       "DNS": "Enable",  
+       "Ping": "Enable"  
+     }  
+   }  
+ }
 
-    Eg. `responses = client.get_filter("Zone", Filter.EQUAL, "LAN")  # get LAN zone`
+response = client.set("Zone", data)
+```
 
-    Eg. `responses = client.get_filter("Zone", Filter.LIKE, "AN")  # get zones with "AN" in the name`
+* `add(entity, data)` - like set, but will fail if an entity with the same name exists.
 
-    Eg. `responses = client.get_filter("Zone", Filter.EXCEPT, "LAN")  # get all zones except LAN`
+* `update(entity, data)` - like set, but will fail if the entity does not exist.
 
-    **Note:** To use filters, you need to import the Filter enum: `from sophosapi import Filter`
+* `remove(entity, name)` - remove the entity with the given name.
 
-  - `set(entity, data)` - create or update an entity, with the given data.
-    The response is not a list, but the direct data.
-    Eg.
-    ``` python
-    data = {
-        "Name": "new_zone",
-        "Type": "LAN",
-        "ApplianceAccess": {
-            "AuthenticationServices": {
-                "CaptivePortal": "Enable"
-            },
-            "NetworkServices": {
-                "DNS": "Enable",
-                "Ping": "Enable"
-            }
-        }
-    }
+Eg. `response = client.remove(entity, name)`
 
-    response = client.set("Zone", data)
-    ```
+* For the `get` functions, the output is a list of `Response` objects. A `Response`  
+  has 2 main properties: the `data` and the `status_code`.
 
-  - `add(entity, data)` - like set, but will fail if an entity with the same name exists.
+* For the `set`, `add`, `update` and `remove` functions, the output is a single  
+  `Response`. The data and status code indicate the success of the call.
 
-  - `update(entity, data)` - like set, but will fail if the entity does not exist.
+* use `get` calls to familiarize yourself with the API. This way you would  
+  have a good example of how your `set` data should be built, as well as an  
+  indication if there is some missing function in this SDK.
 
-  - `remove(entity, name)` - remove the entity with the given name.
+* if you do not provide the username, password or Firewall IP, you will be  
+  asked to provide these. The password that you provide needs to be the  
+  plaintext password in this case.
 
-    Eg. `response = client.remove(entity, name)`
+  You can also set environment variables for the username, encrypted password  
+  and Firewall IP or hostname:  
+  - SOPHOS_API_USERNAME  
+  - SOPHOS_API_PASSWORD  
+  - SOPHOS_API_FIREWALL_IP  
+  - SOPHOS_API_ALLOW_INSECURE_CERTS
 
-- For the `get` functions, the output is a list of `Response` objects. A `Response`
-  has 2 main properties: the `data` and the `status_code`.
+* You can aggregate calls by building a `Request`.
 
-- For the `set`, `add`, `update` and `remove` functions, the output is a single
-  `Response`. The data and status code indicate the success of the call.
+```python
+from sfosapi import Client  
+from sfosapi import Request
 
-- use `get` calls to familiarize yourself with the API. This way you would
-  have a good example of how your `set` data should be built, as well as an
-  indication if there is some missing function in this SDK.
+client = Client()  
+request = Request()
 
-- if you do not provide the username, password or Firewall IP, you will be
-  asked to provide these. The password that you provide needs to be the
-  plaintext password in this case.
+request.set("Zone", {...})  
+request.set("IPHost", {...})  
+request.get("FirewallRule")
 
-  You can also set environment variables for the username, encrypted password
-  and Firewall IP or hostname:
-  - SOPHOS_API_USERNAME
-  - SOPHOS_API_PASSWORD_ENCRYPTED
-  - SOPHOS_API_FIREWALL_IP
+responses = client.send(request)
+```
 
-- You can aggregate calls by building a `Request`.
-  ``` python
-  from sophosapi import Client
-  from sophosapi import Request
-
-  client = Client()
-  request = Request(apiversion="1805.2")
-
-  request.set("Zone", {...})
-  request.set("IPHost", {...})
-  request.get("FirewallRule")
-
-  responses = client.send(request)
-  ...
-  ```
-
-  In this case, note that the order that you prepare the calls is not preserved.
-  `get` requests are processed first, followed by `set`, `add`, `update` and
-  `remove`. The `Response`s have a `transactionid` field which can help determine
-  which call the response belongs to.
+In this case, note that the order that you prepare the calls is not preserved.  
+`get` requests are processed first, followed by `set`, `add`, `update` and  
+`remove`. The `Response`s have a `transactionid` field which can help determine  
+which call the response belongs to.
